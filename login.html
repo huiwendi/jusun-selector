@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고객 로그인</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:linear-gradient(135deg,#1e3a5f,#2d6a9f);min-height:100vh;display:flex;justify-content:center;align-items:center;padding:20px}
+
+.login-wrap{background:#fff;border-radius:20px;padding:40px 30px;width:100%;max-width:400px;box-shadow:0 10px 50px rgba(0,0,0,.3);text-align:center}
+.login-wrap h2{font-size:22px;color:#1e3a5f;margin-bottom:6px}
+.login-wrap .sub{font-size:13px;color:#888;margin-bottom:24px}
+
+.sel-wrap{position:relative;margin-bottom:16px;text-align:left}
+.sel-wrap label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:6px}
+.sel-wrap select{width:100%;padding:14px 16px;border:2px solid #ddd;border-radius:10px;font-size:15px;appearance:none;background:#fff url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%23999' d='M7 10l5 5 5-5z'/></svg>") no-repeat right 14px center;background-size:20px;cursor:pointer}
+.sel-wrap select:focus{border-color:#2d6a9f;outline:none}
+
+.pw-wrap{margin-bottom:20px;text-align:left}
+.pw-wrap label{display:block;font-size:12px;font-weight:600;color:#555;margin-bottom:6px}
+.pw-wrap input{width:100%;padding:14px 16px;border:2px solid #ddd;border-radius:10px;font-size:15px;text-align:center;letter-spacing:4px;outline:none}
+.pw-wrap input:focus{border-color:#2d6a9f}
+
+.login-btn{width:100%;padding:14px;background:#2d6a9f;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+.login-btn:hover{background:#1e3a5f}
+
+.error{color:#e74c3c;font-size:12px;margin-top:10px;min-height:18px}
+
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.shake{animation:shake .3s ease}
+
+.footer{font-size:11px;color:#aaa;margin-top:24px}
+</style>
+</head>
+<body>
+
+<div class="login-wrap">
+  <h2>🔐 고객 로그인</h2>
+  <div class="sub">고객 이름을 선택하고 비밀번호를 입력하세요</div>
+
+  <div class="sel-wrap">
+    <label>고객 선택</label>
+    <select id="customerSelect">
+      <option value="">-- 선택 --</option>
+    </select>
+  </div>
+
+  <div class="pw-wrap">
+    <label>비밀번호</label>
+    <input type="password" id="pwInput" placeholder="비밀번호" onkeyup="if(event.key==='Enter')doLogin()" autocomplete="off">
+  </div>
+
+  <button class="login-btn" onclick="doLogin()">로그인</button>
+  <div class="error" id="loginError"></div>
+
+  <div class="footer">
+    <a href="admin.html" style="color:#aaa;text-decoration:none">관리자</a>
+  </div>
+</div>
+
+<script>
+// ======================================
+// 고객 정보 (여기만 수정하면 됩니다)
+// ======================================
+const CUSTOMERS = [
+  { id:'cust01', name:'김철수', pw:'1234', addr:'서울 강남구 역삼동 123', phone:'010-1111-2222', memo:'' },
+  { id:'cust02', name:'이영희', pw:'5678', addr:'부산 해운대구 우동 456', phone:'010-3333-4444', memo:'사장님 직거래' },
+  { id:'cust03', name:'박민준', pw:'0000', addr:'인천 남동구 구월동 789', phone:'010-5555-6666', memo:'' }
+  // 고객 추가: 위처럼 복사해서 붙이세요
+  // id: 고객식별코드(중복X), name:이름, pw:비밀번호, addr:주소, phone:연락처, memo:메모(선택)
+];
+
+// ======================================
+// 고객 목록 채우기
+const sel = document.getElementById('customerSelect');
+CUSTOMERS.forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c.id;
+  opt.textContent = c.name;
+  sel.appendChild(opt);
+});
+
+function doLogin() {
+  const cid = document.getElementById('customerSelect').value;
+  const pw = document.getElementById('pwInput').value;
+  const errEl = document.getElementById('loginError');
+  
+  if (!cid) { errEl.textContent = '고객을 선택해주세요'; return; }
+  if (!pw) { errEl.textContent = '비밀번호를 입력해주세요'; return; }
+  
+  const customer = CUSTOMERS.find(c => c.id === cid);
+  if (!customer || customer.pw !== pw) {
+    errEl.textContent = '비밀번호가 틀렸습니다';
+    document.querySelector('.login-wrap').classList.add('shake');
+    setTimeout(() => document.querySelector('.login-wrap').classList.remove('shake'), 300);
+    return;
+  }
+  
+  // 로그인 정보 저장 후 메인 페이지로
+  sessionStorage.setItem('customer', JSON.stringify({
+    name: customer.name,
+    addr: customer.addr,
+    phone: customer.phone,
+    memo: customer.memo
+  }));
+  window.location.href = 'index.html';
+}
+</script>
+</body>
+</html>
