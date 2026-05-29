@@ -474,6 +474,7 @@ function renderGrid() {
 function openModal(name) {
   const g = groups.find(gg => gg.name === name);
   if (!g) return;
+  currentModalGroup = g;
   const totalStock = g.options.reduce((s,o)=>s+o.stock,0);
   const imgHtml = g.image
     ? `<img class="modal-img" src="${esc(g.image)}" onerror="this.className='modal-img placeholder';this.textContent='📷'">`
@@ -509,10 +510,14 @@ function openModal(name) {
   document.getElementById('modal').classList.add('active');
 }
 
+let currentModalGroup = null;
+
 function changeModalQty(idx, delta) {
   const el = document.getElementById('mqty_'+idx);
   let v = parseInt(el.textContent)+delta;
-  if(v<0)v=0; if(v>999)v=999;
+  const stock = currentModalGroup ? (currentModalGroup.options[idx]?.stock || 0) : 999;
+  if(v<0)v=0;
+  if(v>stock)v=stock;
   el.textContent=v;
 }
 
@@ -522,9 +527,16 @@ function addOptToCart(name, idx) {
   const o = g.options[idx];
   const qty = parseInt(document.getElementById('mqty_'+idx).textContent)||1;
   if(qty<=0||o.stock<=0)return;
-  document.getElementById('mqty_'+idx).textContent=1;
   
+  // 检查购物车已有数量 + 本次数量 不超库存
   const exist = cart.findIndex(c => c.name===name && c.optName===o.optName);
+  const cartQty = exist>=0 ? cart[exist].qty : 0;
+  if(cartQty + qty > o.stock) {
+    alert('재고('+o.stock.toLocaleString()+'개)를 초과할 수 없습니다');
+    return;
+  }
+  
+  document.getElementById('mqty_'+idx).textContent=1;
   if(exist>=0) cart[exist].qty+=qty;
   else cart.push({name,optName:o.optName,price:o.price,barcode:o.barcode,image:o.image||g.image,qty});
   updateCart();
@@ -575,7 +587,16 @@ function updateCart() {
   }
 }
 
-function cartQty(idx, delta) { cart[idx].qty+=delta; if(cart[idx].qty<1)cart[idx].qty=1; updateCart(); }
+function cartQty(idx, delta) {
+  const c = cart[idx];
+  const g = groups.find(gg => gg.name === c.name);
+  const o = g ? g.options.find(oo => oo.optName === c.optName) : null;
+  const max = o ? o.stock : 999;
+  c.qty += delta;
+  if (c.qty < 1) c.qty = 1;
+  if (c.qty > max) { c.qty = max; alert('재고('+max.toLocaleString()+'개)를 초과할 수 없습니다'); }
+  updateCart();
+}
 function removeFromCart(idx) { cart.splice(idx,1); updateCart(); }
 function clearCart() { if(confirm('주문 목록을 비우시겠습니까?')){cart=[];updateCart();} }
 function closeModal() { document.getElementById('modal').classList.remove('active'); }
