@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>상품 선택기</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:#f5f5f5;color:#333}
+
+#dropZone{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(30,58,95,.92);z-index:9999;display:none;justify-content:center;align-items:center;color:#fff;font-size:24px;font-weight:700;text-align:center;padding:20px}
+
+/* 顶部 */
+.top-bar{background:#1e3a5f;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.top-bar h1{font-size:17px;white-space:nowrap}
+.upload-btn{background:#fff;color:#1e3a5f;padding:7px 14px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;border:none;white-space:nowrap}
+.upload-btn:hover{background:#e0e0e0}
+.upload-btn input{display:none}
+.top-info{font-size:10px;opacity:.7;margin-left:auto;text-align:right;line-height:1.5}
+.top-info .green{color:#5f5}
+
+/* 搜索栏 */
+.search-sticky{position:sticky;top:0;z-index:99;background:#fff;padding:10px 14px;border-bottom:1px solid #eee;display:none;gap:6px;align-items:center}
+.search-sticky input{flex:1;min-width:0;padding:8px 10px;border:2px solid #ddd;border-radius:8px;font-size:13px;outline:none}
+.search-sticky input:focus{border-color:#2d6a9f}
+.search-clear{width:30px;height:30px;border:none;border-radius:6px;background:#eee;color:#999;font-size:13px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.search-clear:hover{background:#e74c3c;color:#fff}
+.search-sticky select{padding:8px 10px;border:2px solid #ddd;border-radius:8px;font-size:12px;background:#fff;max-width:110px}
+
+/* 主体 */
+.container{display:flex;min-height:calc(100vh - 54px)}
+.product-area{flex:1;padding:12px;overflow-y:auto}
+.cart-area{width:370px;min-width:370px;background:#fff;border-left:1px solid #ddd;padding:16px;display:flex;flex-direction:column}
+.cart-area h2{font-size:13px;margin-bottom:8px;color:#1e3a5f;padding-bottom:8px;border-bottom:2px solid #1e3a5f}
+
+/* 商品网格 */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.card{background:#fff;border-radius:10px;border:1px solid #eee;overflow:hidden;cursor:pointer;transition:all .15s}
+.card:hover{border-color:#2d6a9f;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.card:active{transform:scale(.98)}
+.card-img{width:100%;height:180px;object-fit:contain;background:#fafafa;display:block}
+.card-img.placeholder{display:flex;align-items:center;justify-content:center;background:#f7f7f7;color:#ddd;font-size:38px}
+.card-body{padding:9px 11px 12px}
+.card-name{font-size:11px;font-weight:600;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:30px}
+.card-meta{font-size:9px;color:#888;margin:3px 0}
+.card-stock{font-size:13px;font-weight:700}
+.card-stock.green{color:#27ae60}.card-stock.yellow{color:#f39c12}.card-stock.red{color:#e74c3c}.card-stock.gray{color:#999}
+.card-price{font-size:11px;color:#e74c3c;font-weight:600;margin-top:1px}
+
+/* 弹窗 */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;justify-content:center;align-items:center;padding:16px}
+.modal-overlay.active{display:flex}
+.modal{background:#fff;border-radius:14px;width:100%;max-width:700px;max-height:85vh;overflow-y:auto;padding:22px;position:relative}
+.modal-close{position:sticky;float:right;top:0;font-size:24px;cursor:pointer;color:#999;background:#fff;border:none;z-index:1;margin:-10px -10px 0 0;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center}
+.modal-close:hover{color:#333;background:#eee}
+.modal-top{display:flex;gap:14px;margin-bottom:14px;clear:both}
+.modal-img{width:160px;min-width:160px;height:160px;object-fit:contain;border-radius:8px;background:#fafafa}
+.modal-img.placeholder{display:flex;align-items:center;justify-content:center;background:#f7f7f7;color:#ddd;font-size:42px}
+.modal-header{flex:1;min-width:0}
+.modal-name{font-size:16px;font-weight:700;line-height:1.35;margin-bottom:4px}
+.modal-barcode{font-size:10px;color:#888;margin-bottom:3px}
+.modal-total-stock{font-size:13px;font-weight:700;color:#27ae60}
+
+/* 选项列表 */
+.opt-list{margin:12px 0}
+.opt-item{display:flex;align-items:center;padding:8px 10px;margin:2px 0;border:1px solid #eee;border-radius:8px;gap:8px}
+.opt-item:active{background:#f0f0f0}
+.opt-img{width:40px;height:40px;object-fit:contain;border-radius:4px;background:#fafafa;flex-shrink:0}
+.opt-label{flex:1;font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opt-price{font-size:11px;color:#888;min-width:55px;text-align:right}
+.opt-stock{font-size:12px;min-width:45px;text-align:right;font-weight:700}
+.opt-stock.has{color:#27ae60}.opt-stock.none{color:#e74c3c}
+.opt-qty{display:flex;align-items:center;gap:3px}
+.opt-qty button{width:26px;height:26px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer;font-size:15px;line-height:1}
+.opt-qty button:active{background:#eee}
+.opt-qty button:disabled{opacity:.3}
+.opt-qty .qty{font-size:13px;font-weight:600;min-width:22px;text-align:center}
+.btn-add-opt{background:#2d6a9f;color:#fff;border:none;padding:6px 10px;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;white-space:nowrap}
+.btn-add-opt:hover{background:#1e3a5f}
+.btn-add-opt:disabled{background:#ccc}
+
+/* 购物车 */
+.cart-list{flex:1;overflow-y:auto}
+.cart-empty{text-align:center;color:#aaa;padding:35px 0;font-size:12px}
+.cart-item{display:flex;padding:7px 0;border-bottom:1px solid #eee;gap:6px;align-items:center}
+.cart-item-img{width:38px;height:38px;object-fit:contain;border-radius:4px;background:#fafafa;flex-shrink:0}
+.cart-item-info{flex:1;min-width:0}
+.cart-item-name{font-size:10px;font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cart-item-opt{font-size:9px;color:#888}
+.cart-item-row{display:flex;justify-content:space-between;align-items:center;margin-top:2px}
+.cart-item-price{font-weight:700;color:#e74c3c;font-size:13px}
+.cart-item-qty{display:flex;align-items:center;gap:2px}
+.cart-item-qty button{width:20px;height:20px;border:1px solid #ddd;border-radius:3px;background:#fff;cursor:pointer;font-size:11px;line-height:1}
+.cart-item-qty .qty{font-size:11px;font-weight:600;min-width:16px;text-align:center}
+.cart-item-del{color:#e74c3c;cursor:pointer;font-size:10px;background:none;border:none}
+
+.cart-total{padding:10px 0 0;border-top:2px solid #1e3a5f;margin-top:auto}
+.cart-total-row{display:flex;justify-content:space-between;font-size:12px;margin:2px 0}
+.cart-total-row.total{font-size:16px;font-weight:700;color:#e74c3c;margin-top:5px}
+.cart-actions{display:flex;gap:5px;margin-top:8px}
+.cart-actions button{flex:1;padding:9px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;border:none;-webkit-tap-highlight-color:transparent}
+.btn-order{background:#2d6a9f;color:#fff}.btn-order:hover{background:#1e3a5f}
+.btn-clear{background:#eee;color:#666}.btn-clear:hover{background:#ddd}
+
+.empty-state{text-align:center;padding:60px 16px;color:#aaa}
+.empty-state .icon{font-size:48px;margin-bottom:10px}
+.empty-state p{font-size:13px;margin:3px 0}
+.empty-state .hint{font-size:11px;color:#bbb}
+
+/* 密码门 */
+.login-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:linear-gradient(135deg,#1e3a5f,#2d6a9f);z-index:99999;display:flex;justify-content:center;align-items:center}
+.login-overlay.hidden{display:none}
+.login-box{background:#fff;border-radius:16px;padding:40px 30px;text-align:center;width:90%;max-width:360px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.login-icon{font-size:48px;margin-bottom:12px}
+.login-title{font-size:18px;font-weight:700;color:#1e3a5f;margin-bottom:6px}
+.login-desc{font-size:13px;color:#888;margin-bottom:20px}
+.login-input{width:100%;padding:14px 16px;border:2px solid #ddd;border-radius:10px;font-size:16px;text-align:center;outline:none;letter-spacing:4px}
+.login-input:focus{border-color:#2d6a9f}
+.login-btn{width:100%;padding:14px;background:#2d6a9f;color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;margin-top:12px}
+.login-btn:hover{background:#1e3a5f}
+.login-error{color:#e74c3c;font-size:12px;margin-top:8px;min-height:18px}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.login-shake{animation:shake .3s ease}
+
+.loading{text-align:center;padding:60px 16px;color:#888}
+
+.loading{text-align:center;padding:60px 16px;color:#888}
+.loading .spin{display:inline-block;width:40px;height:40px;border:3px solid #ddd;border-top-color:#2d6a9f;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+@media(max-width:768px){
+  .container{flex-direction:column}
+  .cart-area{width:100%;min-width:0;position:fixed;bottom:0;left:0;right:0;z-index:200;max-height:45vh;border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.15);border-left:none;transition:max-height .3s}
+  .cart-area.collapsed{max-height:52px;overflow:hidden}
+  .cart-toggle{display:flex!important;justify-content:space-between;align-items:center;padding:4px 0 8px;cursor:pointer;font-size:13px;font-weight:700;color:#1e3a5f}
+  .cart-toggle .arrow{transition:transform .3s;font-size:18px}
+  .cart-area.collapsed .cart-toggle .arrow{transform:rotate(180deg)}
+  .cart-area.collapsed .cart-list,.cart-area.collapsed .cart-total{display:none}
+  .product-area{padding-bottom:60px}
+
+  .grid{grid-template-columns:repeat(2,1fr);gap:8px}
+  .card-img{height:140px}
+  .card-body{padding:7px 9px 10px}
+  .card-name{font-size:10px;min-height:27px}
+  .modal-top{flex-direction:column;align-items:center}
+  .modal-img{width:140px;min-width:140px;height:140px}
+  .modal-name{font-size:15px}
+  .opt-item{flex-wrap:wrap;padding:8px}
+  .search-sticky{padding:8px 10px}
+}
+
+@media(max-width:400px){
+  .grid{grid-template-columns:repeat(2,1fr);gap:6px}
+  .card-img{height:120px}
+  .top-bar{padding:8px 10px}
+  .top-bar h1{font-size:15px}
+}
+</style>
+</head>
+<body>
+
+<!-- 密码门 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-icon">🔐</div>
+    <div class="login-title">고객 전용 페이지</div>
+    <div class="login-desc">비밀번호를 입력해주세요</div>
+    <input type="password" id="loginPw" class="login-input" placeholder="비밀번호" onkeyup="if(event.key==='Enter')checkPw()" autocomplete="off">
+    <button class="login-btn" onclick="checkPw()">확인</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<div id="dropZone">📁 파일을 여기에 놓으세요</div>
+
+<div class="top-bar">
+  <h1>🎣 상품 선택기</h1>
+  <label class="upload-btn">
+    📥 재고 업로드
+    <input type="file" id="fileInput" accept=".xls,.xlsx" onchange="loadFile(this)">
+  </label>
+  <div class="top-info" id="topInfo"></div>
+</div>
+
+<div class="search-sticky" id="searchSticky" style="display:none">
+  <input type="text" id="searchInput" placeholder="검색: 바코드 또는 상품명..." onkeyup="doSearch()" autocomplete="off">
+  <button class="search-clear" onclick="clearSearch()" title="지우기">✕</button>
+  <select id="sortSelect" onchange="filterAndSort()">
+    <option value="name">이름순</option>
+    <option value="stock-desc">재고↓</option>
+    <option value="stock-asc">재고↑</option>
+  </select>
+</div>
+
+<div class="container">
+  <div class="product-area" id="productArea">
+    <div class="loading" id="loading">
+      <div class="spin"></div>
+      <p>재고 데이터를 불러오는 중입니다...</p>
+    </div>
+  </div>
+
+  <div class="cart-area" id="cartArea">
+    <div class="cart-toggle" onclick="toggleCart()" id="cartToggle" style="display:none">
+      🛒 주문 목록 <span id="cartBadge"></span>
+      <span class="arrow">▼</span>
+    </div>
+    <div class="cart-list" id="cartList">
+      <div class="cart-empty">상품을 선택해주세요</div>
+    </div>
+    <div class="cart-total" id="cartTotal" style="display:none">
+      <div class="cart-total-row">품목 수 <span id="cartItemCount">0</span>개</div>
+      <div class="cart-total-row total">합계 <span id="totalPrice">-</span></div>
+      <div class="cart-actions">
+        <button class="btn-order" onclick="exportOrder()">📋 주문서</button>
+        <button class="btn-clear" onclick="clearCart()">비우기</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">×</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script>
+// ===== 비밀번호 =====
+// 비밀번호 변경: https://emn178.github.io/online-tools/sha256.html 에서
+// 새 비밀번호를 SHA256 해시해서 아래 값 교체
+const PW_HASH = '03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4'; // 기본: "1234"
+
+async function sha256(msg) {
+  const buf = new TextEncoder().encode(msg);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function checkPw() {
+  const input = document.getElementById('loginPw').value;
+  const errEl = document.getElementById('loginError');
+  if (!input) { errEl.textContent = '비밀번호를 입력해주세요'; return; }
+  
+  const hash = await sha256(input);
+  if (hash === PW_HASH) {
+    document.getElementById('loginOverlay').classList.add('hidden');
+    sessionStorage.setItem('authed', '1');
+  } else {
+    errEl.textContent = '비밀번호가 틀렸습니다';
+    const box = document.querySelector('.login-box');
+    box.classList.add('login-shake');
+    setTimeout(() => box.classList.remove('login-shake'), 300);
+    document.getElementById('loginPw').value = '';
+  }
+}
+
+// 세션 유지 (브라우저 닫기 전까지 재인증 불필요)
+if (sessionStorage.getItem('authed') === '1') {
+  document.getElementById('loginOverlay').classList.add('hidden');
+}
+
+// ===== 데이터 =====
+let groups = [];
+let filteredGroups = [];
+let cart = [];
+let allBarcodes = {};
+
+// ============ 自动从服务器加载 inventory.xls ============
+async function autoLoad() {
+  try {
+    // xls 就是 inventory.xls
+    const url = 'inventory.xls';
+    const resp = await fetch(url, {cache:'no-store', redirect:'follow'});
+    if (!resp.ok) throw new Error('HTTP '+resp.status);
+    const data = await resp.arrayBuffer();
+    const wb = XLSX.read(new Uint8Array(data), {type:'array'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    parseData(rows);
+    document.getElementById('topInfo').innerHTML = '<span class="green">●</span> 서버 데이터 로드됨';
+  } catch(e) {
+    console.log('서버 자동 로드 실패:', e.message);
+    document.getElementById('loading').innerHTML = `
+      <div class="empty-state">
+        <div class="icon">📁</div>
+        <p>서버에서 데이터를 불러오지 못했습니다</p>
+        <p class="hint">재고표를 직접 업로드해주세요</p>
+      </div>`;
+    document.getElementById('topInfo').textContent = '데이터 없음';
+  }
+}
+
+// ============ 文件加载（手动上传） ============
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      parseData(rows);
+      document.getElementById('topInfo').innerHTML = '<span style="color:#f90">●</span> 직접 업로드';
+    } catch(err) { alert('파일 해석 실패: '+err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+  input.value = '';
+}
+
+function parseData(rows) {
+  if (rows.length < 2) { alert('파일이 비어있습니다'); return; }
+  
+  let hdrRow = -1;
+  for (let i = 0; i < Math.min(10, rows.length); i++) {
+    if (rows[i].some(c => String(c).includes('상품코드'))) { hdrRow = i; break; }
+  }
+  if (hdrRow < 0) { alert('헤더 행을 찾을 수 없습니다'); return; }
+  
+  const hdr = rows[hdrRow].map(c => String(c).trim());
+  
+  const findCol = names => {
+    for (const n of names) {
+      const idx = hdr.findIndex(h => h.includes(n));
+      if (idx >= 0) return idx;
+    }
+    return -1;
+  };
+  
+  const colBarcode  = findCol(['바코드']);
+  const colName     = findCol(['상품명']);
+  const colOpt      = findCol(['옵션']);
+  const colPrice    = findCol(['판매가']);
+  const colStock    = findCol(['정상재고']);
+  const colImg      = findCol(['이미지URL']);
+  const colGroupCode = findCol(['대표상품코드']);
+  const colSkuCode  = findCol(['상품코드']);
+  
+  if (colName < 0 || colStock < 0) { alert('필수 열이 없습니다'); return; }
+  
+  const groupMap = {};
+  allBarcodes = {};
+  
+  for (let i = hdrRow + 1; i < rows.length; i++) {
+    const r = rows[i];
+    const name = String(r[colName] || '').trim();
+    if (!name || name.startsWith('-') || name === '합계') continue;
+    
+    const barcode = String(r[colBarcode] || '').trim();
+    const optName = String(r[colOpt] || '').trim().replace(/^\[|\]$/g, '');
+    const price = parseInt(r[colPrice]) || 0;
+    const stock = parseInt(r[colStock]) || 0;
+    const img = String(r[colImg] || '').trim();
+    const groupCode = String(r[colGroupCode] || '').trim();
+    const skuCode = String(r[colSkuCode] || '').trim();
+    
+    if (!groupMap[name]) groupMap[name] = {name, code: groupCode, options:[], optMap:{}, image: img || ''};
+    if (!groupMap[name].image && img) groupMap[name].image = img;
+    
+    const g = groupMap[name];
+    const displayOpt = optName || '(옵션없음)';
+    
+    if (g.optMap[displayOpt]) {
+      g.optMap[displayOpt].stock += stock;
+      if (!g.optMap[displayOpt].image && img) g.optMap[displayOpt].image = img;
+    } else {
+      const optImg = img || g.image || '';
+      g.optMap[displayOpt] = {optName: displayOpt, skuCode, barcode, price, stock, image: optImg};
+      if (barcode) allBarcodes[barcode] = name;
+    }
+  }
+  
+  groups = Object.values(groupMap).map(g => ({
+    name: g.name, code: g.code, image: g.image,
+    options: Object.values(g.optMap).sort((a,b) => a.optName.localeCompare(b.optName))
+  }));
+  groups.sort((a,b) => a.name.localeCompare(b.name));
+  filteredGroups = [...groups];
+  
+  document.getElementById('searchSticky').style.display = 'flex';
+  document.getElementById('searchInput').value = '';
+  document.getElementById('sortSelect').value = 'name';
+  document.getElementById('loading').style.display = 'none';
+  renderGrid();
+}
+
+// ============ 搜索 ============
+function doSearch() { filterAndSort(); }
+
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  filterAndSort();
+}
+
+function filterAndSort() {
+  const q = document.getElementById('searchInput').value.trim();
+  const sort = document.getElementById('sortSelect').value;
+  
+  if (!q) {
+    filteredGroups = [...groups];
+  } else {
+    const qUpper = q.toUpperCase();
+    const qNum = q.replace(/[^0-9]/g, '');
+    filteredGroups = groups.filter(g => {
+      if (g.name.indexOf(q) !== -1) return true;
+      if (g.options.some(o => o.optName.indexOf(q) !== -1)) return true;
+      return g.options.some(o => {
+        if (!o.barcode) return false;
+        const bc = o.barcode.toUpperCase();
+        if (bc.indexOf(qUpper) !== -1) return true;
+        if (qNum && bc.replace(/[^0-9]/g, '').indexOf(qNum) !== -1) return true;
+        return false;
+      });
+    });
+  }
+  
+  if (sort === 'stock-desc') {
+    filteredGroups.sort((a,b) => {
+      const sa = a.options.reduce((s,o)=>s+o.stock,0);
+      const sb = b.options.reduce((s,o)=>s+o.stock,0);
+      return sb - sa;
+    });
+  } else if (sort === 'stock-asc') {
+    filteredGroups.sort((a,b) => {
+      const sa = a.options.reduce((s,o)=>s+o.stock,0);
+      const sb = b.options.reduce((s,o)=>s+o.stock,0);
+      return sa - sb;
+    });
+  } else {
+    filteredGroups.sort((a,b) => a.name.localeCompare(b.name));
+  }
+  
+  renderGrid();
+}
+
+// ============ 渲染 ============
+function renderGrid() {
+  const area = document.getElementById('productArea');
+  if (!groups.length) return;
+  
+  if (filteredGroups.length === 0) {
+    area.innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>검색 결과가 없습니다</p></div>';
+    return;
+  }
+  
+  let html = '<div class="grid">';
+  html += filteredGroups.map(g => {
+    const totalStock = g.options.reduce((s,o)=>s+o.stock,0);
+    let stockClass = totalStock===0?'gray':totalStock<=5?'red':totalStock<=20?'yellow':'green';
+    const imgHtml = g.image
+      ? `<img class="card-img" src="${esc(g.image)}" loading="lazy" onerror="this.className='card-img placeholder';this.textContent='📷'">`
+      : '<div class="card-img placeholder">📷</div>';
+    const minPrice = Math.min(...g.options.filter(o=>o.price>0).map(o=>o.price), Infinity);
+    
+    return `<div class="card" onclick="openModal('${escAttr(g.name)}')">
+      ${imgHtml}
+      <div class="card-body">
+        <div class="card-name">${esc(g.name)}</div>
+        <div class="card-meta">${g.options.length}개 옵션</div>
+        <div class="card-stock ${stockClass}">재고 ${totalStock.toLocaleString()}</div>
+        ${minPrice<Infinity?`<div class="card-price">최저 ${minPrice.toLocaleString()}원</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+// ============ 弹窗 ============
+function openModal(name) {
+  const g = groups.find(gg => gg.name === name);
+  if (!g) return;
+  const totalStock = g.options.reduce((s,o)=>s+o.stock,0);
+  const imgHtml = g.image
+    ? `<img class="modal-img" src="${esc(g.image)}" onerror="this.className='modal-img placeholder';this.textContent='📷'">`
+    : '<div class="modal-img placeholder">📷</div>';
+  
+  let html = `${imgHtml}<div class="modal-header">
+    <div class="modal-name">${esc(g.name)}</div>
+    ${g.code?`<div class="modal-barcode">대표코드: ${g.code}</div>`:''}
+    <div class="modal-total-stock">총 재고 ${totalStock.toLocaleString()}개</div>
+  </div></div><div class="opt-list">`;
+  
+  g.options.forEach((o, idx) => {
+    const sc = o.stock===0?'none':'has';
+    const priceText = o.price>0?o.price.toLocaleString()+'원':'-';
+    const optImgHtml = o.image?`<img class="opt-img" src="${esc(o.image)}" loading="lazy" onerror="this.style.display='none'">`:'';
+    
+    html += `<div class="opt-item">
+      ${optImgHtml}
+      <div class="opt-label">${esc(o.optName)}${o.barcode?' <span style="font-size:9px;color:#aaa">('+o.barcode+')</span>':''}</div>
+      <div class="opt-price">${priceText}</div>
+      <div class="opt-stock ${sc}">${o.stock===0?'품절':o.stock.toLocaleString()}</div>
+      <div class="opt-qty">
+        <button onclick="changeModalQty(${idx},-1)" ${o.stock<=0?'disabled':''}>−</button>
+        <span class="qty" id="mqty_${idx}">${o.stock>0?1:0}</span>
+        <button onclick="changeModalQty(${idx},1)" ${o.stock<=0?'disabled':''}>+</button>
+      </div>
+      <button class="btn-add-opt" ${o.stock<=0?'disabled':''} onclick="addOptToCart('${escAttr(g.name)}',${idx})">담기</button>
+    </div>`;
+  });
+  
+  html += '</div>';
+  document.getElementById('modalContent').innerHTML = '<div class="modal-top">'+html;
+  document.getElementById('modal').classList.add('active');
+}
+
+function changeModalQty(idx, delta) {
+  const el = document.getElementById('mqty_'+idx);
+  let v = parseInt(el.textContent)+delta;
+  if(v<0)v=0; if(v>999)v=999;
+  el.textContent=v;
+}
+
+function addOptToCart(name, idx) {
+  const g = groups.find(gg => gg.name===name);
+  if(!g)return;
+  const o = g.options[idx];
+  const qty = parseInt(document.getElementById('mqty_'+idx).textContent)||1;
+  if(qty<=0||o.stock<=0)return;
+  document.getElementById('mqty_'+idx).textContent=1;
+  
+  const exist = cart.findIndex(c => c.name===name && c.optName===o.optName);
+  if(exist>=0) cart[exist].qty+=qty;
+  else cart.push({name,optName:o.optName,price:o.price,barcode:o.barcode,image:o.image||g.image,qty});
+  updateCart();
+}
+
+// ============ 购物车 ============
+function updateCart() {
+  const list = document.getElementById('cartList');
+  const total = document.getElementById('cartTotal');
+  const badge = document.getElementById('cartBadge');
+  const toggle = document.getElementById('cartToggle');
+  
+  if (cart.length === 0) {
+    list.innerHTML = '<div class="cart-empty">상품을 선택해주세요</div>';
+    total.style.display = 'none';
+    if (badge) badge.textContent = '';
+    if (toggle) toggle.style.display = 'none';
+  } else {
+    total.style.display = 'block';
+    if (toggle) toggle.style.display = 'flex';
+    const items = cart.reduce((s,c)=>s+c.qty,0);
+    if (badge) badge.textContent = items+'개';
+    
+    list.innerHTML = cart.map((c, i) => {
+      const imgHtml = c.image?`<img class="cart-item-img" src="${esc(c.image)}" onerror="this.style.display='none'">`:'';
+      const up = c.price||0;
+      return `<div class="cart-item">
+        ${imgHtml}
+        <div class="cart-item-info">
+          <div class="cart-item-name">${esc(c.name)}</div>
+          ${c.optName!=='(옵션없음)'?`<div class="cart-item-opt">${esc(c.optName)}</div>`:''}
+          <div class="cart-item-row">
+            <span class="cart-item-price">${up?up.toLocaleString()+'원':''}</span>
+            <div class="cart-item-qty">
+              <button onclick="cartQty(${i},-1)">−</button>
+              <span class="qty">${c.qty}</span>
+              <button onclick="cartQty(${i},1)">+</button>
+              <button class="cart-item-del" onclick="removeFromCart(${i})">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    
+    document.getElementById('cartItemCount').textContent = items;
+    const price = cart.reduce((s,c)=>s+(c.price||0)*c.qty,0);
+    document.getElementById('totalPrice').textContent = price>0?price.toLocaleString()+'원':'-';
+  }
+}
+
+function cartQty(idx, delta) { cart[idx].qty+=delta; if(cart[idx].qty<1)cart[idx].qty=1; updateCart(); }
+function removeFromCart(idx) { cart.splice(idx,1); updateCart(); }
+function clearCart() { if(confirm('주문 목록을 비우시겠습니까?')){cart=[];updateCart();} }
+function closeModal() { document.getElementById('modal').classList.remove('active'); }
+function toggleCart() { document.getElementById('cartArea').classList.toggle('collapsed'); }
+
+// ============ 导出 ============
+function exportOrder() {
+  if (!cart.length) return;
+  let text = '📋 주문서\n'+'='.repeat(45)+'\n\n';
+  text += '상품명 / 옵션 / 수량 / 단가 / 금액\n'+'-'.repeat(45)+'\n\n';
+  cart.forEach((c,i) => {
+    text += `${i+1}. ${c.name}\n`;
+    if(c.optName&&c.optName!=='(옵션없음)') text += `   옵션: ${c.optName}\n`;
+    if(c.barcode) text += `   바코드: ${c.barcode}\n`;
+    if(c.price) text += `   단가: ${c.price.toLocaleString()}원 × ${c.qty}개 = ${(c.price*c.qty).toLocaleString()}원\n`;
+    else text += `   수량: ${c.qty}개\n`;
+    text += '\n';
+  });
+  const items = cart.reduce((s,c)=>s+c.qty,0);
+  const price = cart.reduce((s,c)=>s+(c.price||0)*c.qty,0);
+  text += '='.repeat(45)+'\n';
+  text += `총 ${items}개`;
+  if(price>0) text += `  |  합계 ${price.toLocaleString()}원`;
+  
+  const blob = new Blob(['\uFEFF'+text], {type:'text/plain;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `주문서_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ============ 拖拽 ============
+document.addEventListener('dragover', e => { e.preventDefault(); document.getElementById('dropZone').style.display='flex'; });
+document.addEventListener('dragleave', e => { if(e.target===document.documentElement) document.getElementById('dropZone').style.display='none'; });
+document.getElementById('dropZone').addEventListener('dragover', e => e.preventDefault());
+document.getElementById('dropZone').addEventListener('drop', function(e) {
+  e.preventDefault(); this.style.display='none';
+  const file = e.dataTransfer.files[0];
+  if(file) {
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('fileInput').files = dt.files;
+    loadFile(document.getElementById('fileInput'));
+  }
+});
+document.getElementById('modal').addEventListener('click', function(e) { if(e.target===this) closeModal(); });
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escAttr(s) { return s.replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+// ============ 启动 ============
+autoLoad();
+</script>
+</body>
+</html>
