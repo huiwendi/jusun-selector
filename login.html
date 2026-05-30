@@ -39,11 +39,9 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:lin
   <h2>🔐 고객 로그인</h2>
   <div class="sub">고객 이름을 선택하고 비밀번호를 입력하세요</div>
 
-  <div class="sel-wrap">
-    <label>고객 선택</label>
-    <select id="customerSelect">
-      <option value="">-- 선택 --</option>
-    </select>
+  <div class="pw-wrap">
+    <label>고객명</label>
+    <input type="text" id="nameInput" placeholder="이름 입력" autocomplete="off">
   </div>
 
   <div class="pw-wrap">
@@ -64,34 +62,28 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;background:lin
 // 고객 정보 (여기만 수정하면 됩니다)
 // ======================================
 const CUSTOMERS = [
-  { id:'cust01', name:'김철수', pw:'1234', addr:'서울 강남구 역삼동 123', phone:'010-1111-2222', memo:'' },
-  { id:'cust02', name:'이영희', pw:'5678', addr:'부산 해운대구 우동 456', phone:'010-3333-4444', memo:'사장님 직거래' },
-  { id:'cust03', name:'박민준', pw:'0000', addr:'인천 남동구 구월동 789', phone:'010-5555-6666', memo:'' }
+  { name:'김철수', pw:'1234', addr:'서울 강남구 역삼동 123', phone:'010-1111-2222', memo:'' },
+  { name:'이영희', pw:'5678', addr:'부산 해운대구 우동 456', phone:'010-3333-4444', memo:'사장님 직거래' },
+  { name:'박민준', pw:'0000', addr:'인천 남동구 구월동 789', phone:'010-5555-6666', memo:'' }
   // 고객 추가: 위처럼 복사해서 붙이세요
-  // id: 고객식별코드(중복X), name:이름, pw:비밀번호, addr:주소, phone:연락처, memo:메모(선택)
+  // name:이름, pw:비밀번호, addr:주소, phone:연락처, memo:메모(선택)
 ];
 
-// ======================================
-// 고객 목록 채우기
-const sel = document.getElementById('customerSelect');
-CUSTOMERS.forEach(c => {
-  const opt = document.createElement('option');
-  opt.value = c.id;
-  opt.textContent = c.name;
-  sel.appendChild(opt);
-});
+// ============================================================================
+// 아래는 수정하지 마세요
+// ============================================================================
 
 function doLogin() {
-  const cid = document.getElementById('customerSelect').value;
+  const name = document.getElementById('nameInput').value.trim();
   const pw = document.getElementById('pwInput').value;
   const errEl = document.getElementById('loginError');
   
-  if (!cid) { errEl.textContent = '고객을 선택해주세요'; return; }
+  if (!name) { errEl.textContent = '이름을 입력해주세요'; return; }
   if (!pw) { errEl.textContent = '비밀번호를 입력해주세요'; return; }
   
-  const customer = CUSTOMERS.find(c => c.id === cid);
-  if (!customer || customer.pw !== pw) {
-    errEl.textContent = '비밀번호가 틀렸습니다';
+  const customer = CUSTOMERS.find(c => c.name === name && c.pw === pw);
+  if (!customer) {
+    errEl.textContent = '이름 또는 비밀번호가 틀렸습니다';
     document.querySelector('.login-wrap').classList.add('shake');
     setTimeout(() => document.querySelector('.login-wrap').classList.remove('shake'), 300);
     return;
